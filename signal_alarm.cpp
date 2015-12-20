@@ -17,7 +17,8 @@ void timeout_info(int signo)
    if(limit == 0)
    {
        printf("Sorry, time limit reached.\n");
-       // exit(0);
+       // Original Written Code // exit(0);
+       // To disable the alarm
        val.it_interval.tv_sec = 0;
    }
    printf("only %d senconds left.\n", limit--);

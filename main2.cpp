@@ -74,6 +74,7 @@ int call_parse_proc(pid_t pid){
 	call += "/stat 2>/dev/null";
 	const char *command = call.c_str();
 
+	cout << "Command : " <<  command << endl;
 	FILE* pipe = popen(command, "r");
 if (pipe)
 {
@@ -116,7 +117,7 @@ int main(int argc, char *argv[]){
 	pid_t pid = fork();
 	int temp;
 	if(!pid){
-		system("./trial_1.out");
+		system("firefox");
 	}
 	else{
 		while(1){
