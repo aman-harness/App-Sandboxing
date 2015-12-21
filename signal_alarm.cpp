@@ -21,7 +21,7 @@ void timeout_info(int signo)
        // To disable the alarm
        val.it_interval.tv_sec = 0;
    }
-   printf("only %d senconds left.\n", limit--);
+   printf("Only %d senconds left.\n", limit--);
 }
 
 /* init sigaction */
@@ -32,7 +32,7 @@ void init_sigaction(void)
     act.sa_handler = timeout_info;
     act.sa_flags   = 0;
     sigemptyset(&act.sa_mask);
-    sigaction(SIGPROF, &act, NULL);
+    // sigaction(SIGPROF, &act, NULL);
 } 
 
 /* init */
@@ -44,11 +44,17 @@ void init_time(void)
     val.it_value.tv_usec = 0;
     val.it_interval = val.it_value;
     val.it_value.tv_sec = 1;
-    setitimer(ITIMER_PROF, &val, NULL);
+    setitimer(ITIMER_REAL, &val, NULL);
 }
 
 int main(void)
 {
+
+    if (signal(SIGALRM, (void (*)(int) ) timeout_info) == SIG_ERR) {
+    perror("Unable to catch SIGALRM");
+    exit(1);
+  }
+
     init_sigaction();
     init_time();
     printf("You have only 10 seconds for thinking.\n");

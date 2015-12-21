@@ -15,8 +15,47 @@
 
 using namespace std;
 
-// Global defineations : -
+int end_program = 1;
+
+pid_t pid;
+// Global definations : -
 long long int clock_ticks_per_second = sysconf(_SC_CLK_TCK);
+
+
+// parse proc should be called for each process.
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                For all Process                                       //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+get_all_process(pid_t group_pid){
+
+    char buffer[1280];
+    const char * command = "ps -A -o pgrp= -o pid= -o vsz= -o ucmd=";
+
+    FILE* pipe = popen(command, "r");
+    {if (pipe){
+        while(!feof(pipe)){
+            if(fgets(buffer, 1280, pipe) != NULL){}
+        }
+        pclose(pipe);
+        buffer[strlen(buffer)-1] = '\0';
+    
+       
+
+        
+        
+    }
+
+
+}
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                  The Parse Proc                                      //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 char** str_split(char* a_str, const char a_delim)
 {
@@ -66,8 +105,8 @@ char** str_split(char* a_str, const char a_delim)
     return result;
 }
 
-int call_parse_proc(pid_t pid){
-		long long int utime_ticks, stime_ticks, cum_utime_ticks, cum_stime_ticks;
+int call_parse_proc(){
+	long long int utime_ticks, stime_ticks, cum_utime_ticks, cum_stime_ticks;
 	char buffer[1280];
 	// char * command = "cat /proc/0000/stat 2>/dev/null";
 
@@ -77,57 +116,65 @@ int call_parse_proc(pid_t pid){
 	const char *command = call.c_str();
 
 	FILE* pipe = popen(command, "r");
-if (pipe)
-{
-while(!feof(pipe))
-{
-if(fgets(buffer, 1280, pipe) != NULL){}
-}
-pclose(pipe);
-buffer[strlen(buffer)-1] = '\0';
-
-// cout << buffer << endl;
-
-}
-
-char ** tokens = str_split(buffer, ' ');
-if (tokens)
-{
-    int i;
-
-    // for (i = 13; *(tokens + i); i++)
-    // {
-    //     printf("month= %d - [%s]\n",i,  *(tokens + i));
-    //     // free(*(tokens + i));
-    // }
-
-    utime_ticks = atoi(*(tokens + 13));
-    stime_ticks = atoi(*(tokens + 14));
-    cum_utime_ticks = atoi(*(tokens + 15));
-    cum_stime_ticks = atoi(*(tokens + 16));
-
-    cout << utime_ticks << " " << stime_ticks << " " << cum_utime_ticks <<  " " << cum_stime_ticks << endl;
-    free(tokens);
-}
-
-	cout << " Finished With ParsingProc " << endl;
+    {if (pipe){
+        while(!feof(pipe)){
+            if(fgets(buffer, 1280, pipe) != NULL){}
+        }
+        pclose(pipe);
+        buffer[strlen(buffer)-1] = '\0';
+    
+        // cout << buffer << endl;
+        }
+    
+        char ** tokens = str_split(buffer, ' ');
+        if (tokens)
+        {
+            int i;
+        
+            // for (i = 13; *(tokens + i); i++)
+            // {
+            //     printf("month= %d - [%s]\n",i,  *(tokens + i));
+            //     // free(*(tokens + i));
+            // }
+        
+            utime_ticks = atoi(*(tokens + 13));
+            stime_ticks = atoi(*(tokens + 14));
+            cum_utime_ticks = atoi(*(tokens + 15));
+            cum_stime_ticks = atoi(*(tokens + 16));
+        
+            cout << "utime_ticks -- " <<utime_ticks << " " << "stime_ticks -- " <<stime_ticks << " \n" << 
+            "cum_utime_ticks -- " <<cum_utime_ticks <<  " " << "cum_stime_ticks -- " <<cum_stime_ticks << endl;
+            free(tokens);
+        }
+    }	
+    cout << " Finished With Parsing Proc " << endl;
 }
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//          The functions related to signal handling 
+//                                   The functions related to signal handling                               //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct itimerval val;
-int limit = 10;
+int limit = 5;
 /* signal process */
 void timeout_info(int signo)
 {
    if(limit == 0)
    {
        printf("Sorry, time limit reached.\n");
-       // Original Written Code // exit(0);
+       // Original Code // exit(0);
+       
        // To disable the alarm
        val.it_interval.tv_sec = 0;
+       val.it_interval.tv_usec = 0;
+       val.it_value.tv_sec = 0;
+       end_program = 0;
+       setitimer(ITIMER_PROF, &val, NULL);
    }
    printf("only %d senconds left.\n", limit--);
+   
+   // there should first be a call to all processes.
+   for_all_process();
+   call_parse_proc();
 }
 
 /* init sigaction */
@@ -138,7 +185,12 @@ void init_sigaction(void)
     act.sa_handler = timeout_info;
     act.sa_flags   = 0;
     sigemptyset(&act.sa_mask);
-    sigaction(SIGPROF, &act, NULL);
+    // sigaction(SIGPROF, &act, NULL);
+    if (signal(SIGALRM, (void (*)(int)) timeout_info) == SIG_ERR) {
+      perror("Unable to catch SIGALRM");
+      exit(1);
+    }
+
 } 
 
 /* init */
@@ -149,23 +201,47 @@ void init_time(void)
     val.it_value.tv_sec = 1;
     val.it_value.tv_usec = 0;
     val.it_interval = val.it_value;
-    val.it_value.tv_sec = 1;
-    setitimer(ITIMER_PROF, &val, NULL);
+    // val.it_value.tv_sec = 
+
+    // Time we need is absolute.
+    setitimer(ITIMER_REAL, &val, NULL);
 }
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int main(int argc, char *argv[]){
-	pid_t pid = fork();
-	int temp;
+//  int main(int argc, char *argv[]){
+int main(){
+
+	pid = fork();
+
 	if(!pid){
-		system("./trial_1.out");
+
+		// system("./trial_1.out");
+        char *args[] = { "./busy_wait.out" /*, /* other arguments */, NULL };
+        execve("busy_wait.out", args, NULL);
+
 	}
 	else{
-		while(1){
+
+		init_sigaction();
+        init_time();
+        printf("You have only 10 seconds for thinking.\n");
+
+        // Uncomment this part to get the details of the proc manually:-
+        /*
+        while(1){
 			call_parse_proc(pid);
+            cout << "Press a key to get the details again: ";
 			cin >> temp;
 		}
-	}
+        */
+
+        printf("The timer has started \n");
+        printf("You have only %d seconds for thinking.\n", limit);
+        while(end_program);
+        cout << "Amazingly reached here! \n";
+
+    }
 	return 0;
 }
