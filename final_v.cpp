@@ -1,6 +1,7 @@
-// Since system calls don't return something, they can't be uswed to read result of 
-// commands on terminal. Exec() family functions also can't be used because they eat-up 
-// the whole process which is required for further operations.:-
+// Run the command using exec in line 297 and this process keeps track of the memory consumed
+// and time taaken by that pocess. You can also verify it from the terminal by running command 
+// `top -p <pid_of_your_process> -d 1
+// d sets the refresh rate of the display.
 
 #include <bits/stdc++.h>
 #include <string>
@@ -16,45 +17,22 @@
 using namespace std;
 
 int end_program = 1;
+#define MAXBUFLEN 1000000
 
-pid_t pid;
+pid_t blackbox_pid;
+
 // Global definations : -
 long long int clock_ticks_per_second = sysconf(_SC_CLK_TCK);
-
-
-// parse proc should be called for each process.
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                                For all Process                                       //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-get_all_process(pid_t group_pid){
-
-    char buffer[1280];
-    const char * command = "ps -A -o pgrp= -o pid= -o vsz= -o ucmd=";
-
-    FILE* pipe = popen(command, "r");
-    {if (pipe){
-        while(!feof(pipe)){
-            if(fgets(buffer, 1280, pipe) != NULL){}
-        }
-        pclose(pipe);
-        buffer[strlen(buffer)-1] = '\0';
-    
-       
-
-        
-        
-    }
-
-
-}
-
+struct {
+    int pgrp;
+    int pid;
+    int virtual_size;
+    char ucmd[50];
+} ps_output[500];
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                                  The Parse Proc                                      //
+//                                    The Parse Proc for calculating time                               //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 char** str_split(char* a_str, const char a_delim)
@@ -105,7 +83,7 @@ char** str_split(char* a_str, const char a_delim)
     return result;
 }
 
-int call_parse_proc(){
+long long int parse_proc(pid_t pid){
 	long long int utime_ticks, stime_ticks, cum_utime_ticks, cum_stime_ticks;
 	char buffer[1280];
 	// char * command = "cat /proc/0000/stat 2>/dev/null";
@@ -115,20 +93,24 @@ int call_parse_proc(){
 	call += "/stat 2>/dev/null";
 	const char *command = call.c_str();
 
-	FILE* pipe = popen(command, "r");
-    {if (pipe){
+	FILE* pipe = popen(command, "r");{
+
+    if (pipe){
         while(!feof(pipe)){
             if(fgets(buffer, 1280, pipe) != NULL){}
         }
         pclose(pipe);
         buffer[strlen(buffer)-1] = '\0';
+        cout << " Buffer length: " << strlen(buffer) << endl;
     
         // cout << buffer << endl;
         }
-    
+        else cout << "Error \n" ;
+
         char ** tokens = str_split(buffer, ' ');
         if (tokens)
         {
+            cout << "In token :- ";
             int i;
         
             // for (i = 13; *(tokens + i); i++)
@@ -142,19 +124,94 @@ int call_parse_proc(){
             cum_utime_ticks = atoi(*(tokens + 15));
             cum_stime_ticks = atoi(*(tokens + 16));
         
-            cout << "utime_ticks -- " <<utime_ticks << " " << "stime_ticks -- " <<stime_ticks << " \n" << 
-            "cum_utime_ticks -- " <<cum_utime_ticks <<  " " << "cum_stime_ticks -- " <<cum_stime_ticks << endl;
+            // cout << "utime_ticks -- " <<utime_ticks << " " << "stime_ticks -- " <<stime_ticks << " \n" << 
+            // "cum_utime_ticks -- " <<cum_utime_ticks <<  " " << "cum_stime_ticks -- " <<cum_stime_ticks << endl;
+
             free(tokens);
         }
+        else cout << "Token Failed :/" << endl;
+        
     }	
+
     cout << " Finished With Parsing Proc " << endl;
+
+    return utime_ticks + stime_ticks;
 }
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                For Selecting all Processes                                       //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+int parse_ps(pid_t pgid){
+
+    int time_limit = 5000;
+
+    long long int utime_ticks, stime_ticks, cum_utime_ticks, cum_stime_ticks;
+    char source[100000];
+    // char * command = "cat /proc/0000/stat 2>/dev/null";
+    stack <pid_t> process_of_blackbox;
+    char * command = "ps -A -o pgrp= -o pid= -o vsz= -o ucmd= ";
+
+    long long int total_time = 0, total_memory = 0;
+    FILE* pipe = popen(command, "r");
+    if (pipe){
+        
+
+        // Gets wouldn't work :/  So rewrote it.
+        if (pipe != NULL) {
+            size_t newLen = fread(source, sizeof(char), MAXBUFLEN, pipe);
+            if (newLen == 0) {
+                fputs("Error reading file", stderr);
+            } else {
+                source[newLen++] = '\0'; /* Just to be safe. */
+            }
+        }
+        cout << "Pgid " << pgid << endl;
+        pclose(pipe);
+        source[strlen(source)-1] = '\0';
+        int inp;
+        // cout << source << endl;
+        int n = 1;
+        cout << endl << endl << endl;
+        int offset = 0, bytesRead, count = 0, match = 0;
+        while(n != EOF){
+            n = sscanf(source + offset, "%d %d %d %s\n%n" , &ps_output[count].pgrp, &ps_output[count].pid, &ps_output[count].virtual_size, ps_output[count].ucmd, &bytesRead );
+            // cout << "From Stream: " <<ps_output[count].pgrp << " "  << ps_output[count].pid << " "  
+            //      << ps_output[count].virtual_size << " "  << ps_output[count].ucmd << endl;
+            // cin >> inp;
+            offset += bytesRead;
+            count++;
+
+            if(pgid == ps_output[count].pgrp){ 
+                process_of_blackbox.push(ps_output[count].pid);
+                total_time += parse_proc(ps_output[count].pid);
+                total_memory += ps_output[count].virtual_size;
+                match++;
+            }
+        }
+
+        cout << "No of process in ps: "<< count << endl << "match " << match << endl;
+        cout << "Total time: - " << total_time << "Total Memory:- " << total_memory << endl;
+
+    }
+    cout << " Finished With Parsing Ps " << endl;
+}
+
+
+
+
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                   The functions related to signal handling                               //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct itimerval val;
-int limit = 5;
+int limit = 500;
 /* signal process */
 void timeout_info(int signo)
 {
@@ -173,8 +230,12 @@ void timeout_info(int signo)
    printf("only %d senconds left.\n", limit--);
    
    // there should first be a call to all processes.
-   for_all_process();
-   call_parse_proc();
+   pid_t pid = blackbox_pid;
+   // pid_t pid = getpid();
+
+   parse_ps(pid);
+   // for_all_process();
+   // parse_proc();
 }
 
 /* init sigaction */
@@ -190,7 +251,6 @@ void init_sigaction(void)
       perror("Unable to catch SIGALRM");
       exit(1);
     }
-
 } 
 
 /* init */
@@ -211,15 +271,18 @@ void init_time(void)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 //  int main(int argc, char *argv[]){
+
 int main(){
 
-	pid = fork();
+	pid_t pid = fork();
+    blackbox_pid = pid;
 
 	if(!pid){
 
-		// system("./trial_1.out");
-        char *args[] = { "./busy_wait.out" /*, /* other arguments */, NULL };
-        execve("busy_wait.out", args, NULL);
+        // char *args[] = { "./busy_wait.out" /*, /* other arguments */, NULL };
+        setpgid(0, 0);
+        execvp("/usr/bin/firefox", NULL);
+        // execve("busy_wait.out", args, NULL);
 
 	}
 	else{
@@ -231,7 +294,7 @@ int main(){
         // Uncomment this part to get the details of the proc manually:-
         /*
         while(1){
-			call_parse_proc(pid);
+			parse_proc(pid);
             cout << "Press a key to get the details again: ";
 			cin >> temp;
 		}

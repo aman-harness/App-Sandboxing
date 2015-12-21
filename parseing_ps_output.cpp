@@ -1,8 +1,7 @@
 // parseing ps output
 
-// Since system calls don't return something, they can't be uswed to read result of 
-// commands on terminal. Exec() family functions also can't be used because they eat-up 
-// the whole process which is required for further operations.:-
+// This file run ps-a and shows us the output file along with the virtual size they are using.
+// Used to get the list of running processes.
 
 #include <bits/stdc++.h>
 #include <string>
@@ -19,55 +18,14 @@ using namespace std;
 // Global defineations : -
 long long int clock_ticks_per_second = sysconf(_SC_CLK_TCK);
 
-char** str_split(char* a_str, const char a_delim)
-{
-    char** result    = 0;
-    size_t count     = 0;
-    char* tmp        = a_str;
-    char* last_comma = 0;
-    char delim[2];
-    delim[0] = a_delim;
-    delim[1] = 0;
+struct {
+	int pgrp;
+	int pid;
+	int virtual_size;
+	char ucmd[50];
+} ps_output[500];
 
-    /* Count how many elements will be extracted. */
-    while (*tmp)
-    {
-        if (a_delim == *tmp)
-        {
-            count++;
-            last_comma = tmp;
-        }
-        tmp++;
-    }
-
-    /* Add space for trailing token. */
-    count += last_comma < (a_str + strlen(a_str) - 1);
-
-    /* Add space for terminating null string so caller
-       knows where the list of returned strings ends. */
-    count++;
-
-    result = (char ** )malloc(sizeof(char*) * count);
-
-    if (result)
-    {
-        size_t idx  = 0;
-        char* token = strtok(a_str, delim);
-
-        while (token)
-        {
-            assert(idx < count);
-            *(result + idx++) = strdup(token);
-            token = strtok(0, delim);
-        }
-        assert(idx == count - 1);
-        *(result + idx) = 0;
-    }
-
-    return result;
-}
-
-int call_parse_proc(pid_t pid){
+int parse_ps(pid_t pid){
 	long long int utime_ticks, stime_ticks, cum_utime_ticks, cum_stime_ticks;
 	char source[12800];
 	// char * command = "cat /proc/0000/stat 2>/dev/null";
@@ -90,12 +48,23 @@ int call_parse_proc(pid_t pid){
 
 		pclose(pipe);
 		source[strlen(source)-1] = '\0';
-
+		int inp;
 		cout << source << endl;
+		int n = 1;
+		cout << endl << endl << endl;
+		int offset = 0, bytesRead, count = 0;
+		while(n != EOF){
+			n = sscanf(source + offset, "%d %d %d %s\n%n" , &ps_output[count].pgrp, &ps_output[count].pid, &ps_output[count].virtual_size, ps_output[count].ucmd, &bytesRead );
+			cout << "From Stream: " <<ps_output[count].pgrp << " "  << ps_output[count].pid << " "  
+			     << ps_output[count].virtual_size << " "  << ps_output[count].ucmd << endl;
+			// cin >> inp;
+			offset += bytesRead;
+			count++;
+		}
 
 	}
 
-	cout << " Finished With ParsingProc " << endl;
+	cout << " Finished With Parsing Proc " << endl;
 }
 
 int main(int argc, char *argv[]){
@@ -107,7 +76,7 @@ int main(int argc, char *argv[]){
 	}
 	else{
 		while(1){
-			call_parse_proc(pid);
+			parse_ps(pid);
 			cin >> temp;
 		}
 	}
