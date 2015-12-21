@@ -16,6 +16,16 @@
 
 using namespace std;
 
+// Reasons for the ending of programme.
+#define EXCEED_LIMIT 1
+#define SIG_INT 2
+#define SIG_TERM 3
+#define SIG_QUIT 4
+
+int time_limit = 5000;
+// In kilo_bytes:-
+int memory_limit = 1000000;
+
 int end_program = 1;
 #define MAXBUFLEN 1000000
 
@@ -30,6 +40,64 @@ struct {
     char ucmd[50];
 } ps_output[500];
 
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+//            The Functions Related to Killing the processes in case of limit violations                //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Note: `int kill(pid_t <process_group>, int SIGTERM);` can't be directly used.
+// See: http://stackoverflow.com/questions/3219001/should-i-be-worried-about-the-order-in-which-processes-in-a-process-goup-receiv
+
+
+int signal_to_kill(pid_t pgrp, int total_memory, int total_time){
+    cout << "Killing Process of group: " << pgrp << endl;
+    // Do error handling here. On successful execution kill returns 0;
+    kill(pgrp, SIGSTOP);
+    kill(pgrp, SIGKILL);
+    kill(pgrp, SIGCONT);
+}
+
+int exit_gracefully(pid_t pgrp, int total_memory, int total_time, int reason){
+
+    switch (reason) {    
+        case EXCEED_LIMIT:
+            if(total_time > time_limit)
+                fprintf (stderr, "Programme terminating due because of exceeding time limits(%d)", total_time);
+            else if(total_memory > memory_limit)
+                fprintf (stderr, "Programme terminating due because of exceeding memory limits(%d)", total_memory);
+            break;
+
+        case SIG_TERM:
+            fprintf (stderr, "Received Terminations signal. Terminating Itself and Blackbox Process");
+            break;
+        case SIG_QUIT:
+            fprintf (stderr, "Received Dump Core signal. Terminating Itself and Blackbox Process");
+            break;
+        case SIG_INT:
+            fprintf (stderr, "Received Interrupt signal. Terminating Itself and Blackbox Process");
+            break;
+
+        default:
+            fprintf (stderr, "Exiting due to unknown reasons. Terminating Itself and Blackbox Process");
+    }
+    signal_to_kill(pgrp,  total_memory,  total_time);
+
+    // The periodic memory and time checking needs to be stopped.
+
+    exit(0);
+}
+
+void sig_handler(int signo)
+{
+  pid_t pgrp = blackbox_pid; 
+  if (signo == SIGINT)
+    exit_gracefully(blackbox_pid, 0, 0, 3);
+  if(signo == SIGTERM)
+    exit_gracefully(blackbox_pid, 0, 0, 3);
+  if(signo == SIGQUIT)
+    exit_gracefully(blackbox_pid ,0 , 0, 4);
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                    The Parse Proc for calculating time                               //
@@ -130,7 +198,6 @@ long long int parse_proc(pid_t pid){
             free(tokens);
         }
         else cout << "Token Failed :/" << endl;
-        
     }	
 
     cout << " Finished With Parsing Proc " << endl;
@@ -142,13 +209,11 @@ long long int parse_proc(pid_t pid){
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                                For Selecting all Processes                                       //
+//                                             For Selecting all Processes                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 int parse_ps(pid_t pgid){
-
-    int time_limit = 5000;
 
     long long int utime_ticks, stime_ticks, cum_utime_ticks, cum_stime_ticks;
     char source[100000];
@@ -197,12 +262,15 @@ int parse_ps(pid_t pgid){
         cout << "No of process in ps: "<< count << endl << "match " << match << endl;
         cout << "Total time: - " << total_time << "Total Memory:- " << total_memory << endl;
 
+
+        if(total_memory > memory_limit || total_time > time_limit){
+            exit_gracefully(pgid, total_memory, total_time, EXCEED_LIMIT);
+            // Disable the counter and exit gracefully
+
+        }
     }
     cout << " Finished With Parsing Ps " << endl;
 }
-
-
-
 
 
 
@@ -286,6 +354,15 @@ int main(){
 
 	}
 	else{
+        
+        if (signal(SIGINT, sig_handler) == SIG_ERR)
+            printf("\ncan't catch SIGINT\n");
+
+        if (signal(SIGQUIT, sig_handler) == SIG_ERR)
+         printf("\ncan't catch SIGINT\n");
+
+        if (signal(SIGTERM, sig_handler) == SIG_ERR)
+         printf("\ncan't catch SIGINT\n");
 
 		init_sigaction();
         init_time();
