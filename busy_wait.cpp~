@@ -5,7 +5,6 @@ using namespace std;
 
 // Use this time for setting the time of busy wait. 
 #define TIME 10
-
 void  ALARMhandler(int sig)
 
 {
