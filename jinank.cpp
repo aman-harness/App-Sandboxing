@@ -293,11 +293,8 @@ int parse_ps(pid_t pgid){
                 // total_time += parse_proc(ps_output[count].pid);
                 total_memory += ps_output[count].virtual_size;
                 match++;
-                if(match) xx++;
             }
         }
-        // If all child processes end. 
-        if(!match && xx) exit_gracefully(pgid, 0, 0, 0); 
 
         cout << "No of process in ps: "<< count << endl << "match " << match << endl;
         cout << "Total time: - " << total_time << "Total Memory:- " << total_memory << endl;
@@ -398,7 +395,6 @@ int reading_command_line_arguments(int argc, char *argv[], char** command_to_exe
   limit.memory = 1000000; // In KB.
   limit.frequency = 1; // Time interval after which the prpgramme should be monitored.
 
-  int xx = 0;
   string command;
   int c;
   static int tree_flag;
@@ -522,7 +518,6 @@ int reading_command_line_arguments(int argc, char *argv[], char** command_to_exe
     blackbox_pid = pid;
 
 	if(!pid){
-        char* tt = "firefox";
         cout << command_to_execute << endl;
         // char *args[] = { "./busy_wait.out" /*, /* other arguments */, NULL };
         setpgid(0, 0);
