@@ -15,6 +15,9 @@
 #include <sys/time.h>
 #include <getopt.h>
 #include <sstream>
+#include <sys/types.h> 
+#include <sys/wait.h> 
+
 
 using namespace std;
 
@@ -23,6 +26,9 @@ using namespace std;
 #define SIG_INT 2
 #define SIG_TERM 3
 #define SIG_QUIT 4
+#define Child_died 5
+
+pid_t waitpid(pid_t pid, int *status, int options); 
 
 struct {
     int time;       // Timing in seconds
@@ -31,6 +37,7 @@ struct {
 } limit;
 
 int counter = 0;
+int debug  = 0;
 // For defining the arguments of getopt_long
 int getopt(int argc, char * const argv[],
            const char *optstring);
@@ -88,7 +95,9 @@ int exit_gracefully(pid_t pgrp, int total_memory, int total_time, int reason){
         case SIG_INT:
             fprintf (stderr, "Received Interrupt signal. Terminating Itself and Blackbox Process");
             break;
-
+        case Child_died:
+            fprintf (stderr, "Child Process died. Terminating the Blackbox Process");
+            break;
         default:
             fprintf (stderr, "Exiting due to unknown reasons. Terminating Itself and Blackbox Process");
     }
@@ -166,7 +175,6 @@ char** str_split(char* a_str, const char a_delim)
 
 long long int parse_proc(pid_t pid){
   
-
 	long long int utime_ticks, stime_ticks, cum_utime_ticks, cum_stime_ticks;
 	char buffer[1280];
 	// char * command = "cat /proc/0000/stat 2>/dev/null";
@@ -184,7 +192,7 @@ long long int parse_proc(pid_t pid){
         }
         pclose(pipe);
         buffer[strlen(buffer)-1] = '\0';
-        cout << " Proc length: " << strlen(buffer) << "With Counter " << counter << endl;
+        if(debug) cout << " Proc length: " << strlen(buffer) << "With Counter " << counter << endl;
     
         // cout << buffer << endl;
         }
@@ -200,10 +208,10 @@ long long int parse_proc(pid_t pid){
 
         for (i = 0; *(tokens + i); i++);
 
-        cout << "Token Size : " << i << endl;
+        if(debug) cout << "Token Size : " << i << endl;
 
         if(i != 52) {
-            printf(" Proc Not Yet Ready. (%d), counter --  %d \n", i, counter);
+            if(debug) printf(" Proc Not Yet Ready. (%d), counter --  %d \n", i, counter);
             // sleep(1);
             // cout << buffer << endl;
             // return -1;
@@ -211,7 +219,7 @@ long long int parse_proc(pid_t pid){
 
         else{
             int i; 
-            printf(" Proc Ready. (%d), counter --  %d \n", i, counter);
+            if(debug) printf(" Proc Ready. (%d), counter --  %d \n", i, counter);
             utime_ticks = atoi(*(tokens + 13));
             stime_ticks = atoi(*(tokens + 14));
             cum_utime_ticks = atoi(*(tokens + 15));
@@ -244,7 +252,11 @@ long long int parse_proc(pid_t pid){
 
 
 int parse_ps(pid_t pgid){
-
+    int status;
+    pid_t result = waitpid(pgid, &status, WNOHANG);
+    // result = 0;
+    if(result == -1) exit_gracefully(pgid, 0, 0, 5); 
+    else if(result) exit_gracefully(pgid, 0, 0, 5); 
     counter++;
     long long int utime_ticks, stime_ticks, cum_utime_ticks, cum_stime_ticks;
     char source[100000];
@@ -271,7 +283,7 @@ int parse_ps(pid_t pgid){
         source[strlen(source)-1] = '\0';
         int inp;
         // cout << source << endl;
-        int n = 1;
+        int n = 1, xx =0;
 
         int offset = 0, bytesRead, count = 0, match = 0;
         while(n != EOF){
@@ -286,24 +298,23 @@ int parse_ps(pid_t pgid){
                 process_of_blackbox.push(ps_output[count].pid);
                 int val = -1;
                 while(val == -1){
-                    cout << "Calling parse_proc With counter :" << counter << endl;
+                    if(debug) cout << "Calling parse_proc With counter :" << counter << endl;
                     val = parse_proc(ps_output[count].pid);
                 }
                 total_time += val;
-                // total_time += parse_proc(ps_output[count].pid);
                 total_memory += ps_output[count].virtual_size;
                 match++;
                 if(match) xx++;
             }
         }
         // If all child processes end. 
-        if(!match && xx) exit_gracefully(pgid, 0, 0, 0); 
+        if(!match && xx) exit_gracefully(pgid, 0, 0, 8); 
 
-        cout << "No of process in ps: "<< count << endl << "match " << match << endl;
-        cout << "Total time: - " << total_time << "Total Memory:- " << total_memory << endl;
+        if(debug) cout << "No of process in ps: "<< count << endl << "match " << match << endl;
+        if(debug) cout << "Total time: - " << total_time << "Total Memory:- " << total_memory << endl;
 
 
-cout << "----------------------------------------------------------------" << endl << endl;
+if(debug) cout << "----------------------------------------------------------------" << endl << endl;
 
         if(total_memory > limit.memory || total_time > limit.time){
             exit_gracefully(pgid, total_memory, total_time, EXCEED_LIMIT);
@@ -341,7 +352,7 @@ void timeout_info(int signo)
        end_program = 0;
        setitimer(ITIMER_PROF, &val, NULL);
    }
-   printf("only %d senconds left.\n", limitt--);
+   // printf("only %d senconds left.\n", limitt--);
    
    // there should first be a call to all processes.
    pid_t pid = blackbox_pid;
@@ -418,6 +429,7 @@ int reading_command_line_arguments(int argc, char *argv[], char** command_to_exe
           {"memory",    required_argument, 0, 'm'},
           {"frequency", required_argument, 0, 'f'},
           {"help",      no_argument      , 0, 'h'},
+          {"debug",      no_argument     , 0, 'd'},
           {0, 0, 0, 0}
         };
       /* getopt_long stores the option index here. */
@@ -426,7 +438,7 @@ int reading_command_line_arguments(int argc, char *argv[], char** command_to_exe
       // no colon afterwards ->  No arguments Required.
       // : -> compulsory argument.
       // :: -> Optional Arguments.
-      c = getopt_long (argc, argv, "ht:m:f:",
+      c = getopt_long (argc, argv, "dht:m:f:",
                        long_options, &option_index);
 
       /* Detect the end of the options. */
@@ -451,6 +463,11 @@ int reading_command_line_arguments(int argc, char *argv[], char** command_to_exe
 
         case 'b':
           puts ("option -b\n");
+          break;
+
+        case 'd':
+          printf ("Debugging Active\n");
+          debug = true;
           break;
 
         case 't':
@@ -490,11 +507,11 @@ int reading_command_line_arguments(int argc, char *argv[], char** command_to_exe
   /* Print any remaining command line arguments (not options). */
   if (optind < argc)
     {
-      printf ("non-option ARGV-elements: ");
+      printf ("non-option ARGV-elements: or command to execute is : ");
       while (optind < argc){
             printf ("-- %s \n", argv[optind]);
             if(argv[optind] != NULL){
-              cout << argv[optind] <<  " In\n";
+              // cout << argv[optind] <<  " In\n";
               string temp(argv[optind]);
               command += temp;
               // command += ' ';
@@ -506,7 +523,7 @@ int reading_command_line_arguments(int argc, char *argv[], char** command_to_exe
     // A great function :  Converts Const char * to char *
     // http://stackoverflow.com/questions/12862739/convert-string-to-char
     *command_to_execute = strdup(command.c_str());
-    cout << " -" << *command_to_execute << "-" << endl;
+    // cout << " -" << *command_to_execute << "-" << endl;
 
     // exit(0); 
 }
@@ -522,8 +539,8 @@ int reading_command_line_arguments(int argc, char *argv[], char** command_to_exe
     blackbox_pid = pid;
 
 	if(!pid){
-        char* tt = "firefox";
-        cout << command_to_execute << endl;
+        // char* tt = "firefox";
+        // cout << command_to_execute << endl;
         // char *args[] = { "./busy_wait.out" /*, /* other arguments */, NULL };
         setpgid(0, 0);
         // execvp("firefox", NULL);

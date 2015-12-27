@@ -499,7 +499,7 @@ int reading_command_line_arguments(int argc, char *argv[], char** command_to_exe
       }
       putchar ('\n');
     }
-    // A great function :  Converts Const char * to char *
+    // A useful function :  Converts Const char * to char *
     // http://stackoverflow.com/questions/12862739/convert-string-to-char
     *command_to_execute = strdup(command.c_str());
     cout << " -" << *command_to_execute << "-" << endl;
