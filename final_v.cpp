@@ -7,12 +7,16 @@ using namespace std;
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
  int main(int argc, char *argv[]){
+    int * fork_allowed;
+    int *optind;
+    char * command_to_execute; 
+    char * command_arguments;
+    reading_command_line_arguments(argc, argv, &command_to_execute, &command_arguments, fork_allowed);
+    // reading_command_line_arguments(argc, argv, &optind, fork_allowed);
 
-    char* command_to_execute; 
-    reading_command_line_arguments(argc, argv, &command_to_execute);
 	  pid_t pid = -1;
+      for(int pp = 0; pp < argc; pp++) cout << argv[pp] << endl;
     pid = fork();
-
 	if(!pid){
         // char* tt = "firefox";
         // cout << command_to_execute << endl;
@@ -35,7 +39,7 @@ using namespace std;
         if (signal(SIGTERM, sig_handler) == SIG_ERR)
          printf("\ncan't catch SIGINT\n");
 
-		init_sigaction(pid);
+		    init_sigaction(pid);
         init_time();
         // printf("You have only 10 seconds for thinking.\n");
 

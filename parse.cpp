@@ -14,7 +14,6 @@ using namespace std;
 #define SIG_QUIT 4
 #define Child_died 5
 
-pid_t waitpid(pid_t pid, int *status, int options); 
 
 struct {
     int time;       // Timing in seconds
@@ -384,11 +383,11 @@ void init_time(void)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                   Interpreating the Command Line Arguments                               //
+//                                   Interpreting the Command Line Arguments                               //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-int reading_command_line_arguments(int argc, char *argv[], char** command_to_execute){
+int reading_command_line_arguments(int argc, char *argv[], char** command_to_execute, char ** command_arguments, int *fork_allowed){
       
 
    // Setting default options : 
@@ -397,7 +396,8 @@ int reading_command_line_arguments(int argc, char *argv[], char** command_to_exe
   limit.frequency = 1; // Time interval after which the prpgramme should be monitored.
 
   int xx = 0;
-  string command;
+  * fork_allowed = 0;
+  string command, arguments;
   int c;
   static int tree_flag;
   while (1)
@@ -408,6 +408,7 @@ int reading_command_line_arguments(int argc, char *argv[], char** command_to_exe
           /* These options set a flag. */
           {"tree",      no_argument,  &tree_flag, 1},
           {"group",     no_argument,  &tree_flag, 0},
+          {"fork",     no_argument,  fork_allowed, 1},
           /* These options don’t set a flag.
              We distinguish them by their indices. */ 
           // {"add",       no_argument,       0, 'a'},
@@ -421,6 +422,7 @@ int reading_command_line_arguments(int argc, char *argv[], char** command_to_exe
         };
       /* getopt_long stores the option index here. */
       int option_index = 0;
+
 
       // no colon afterwards ->  No arguments Required.
       // : -> compulsory argument.
@@ -488,28 +490,40 @@ int reading_command_line_arguments(int argc, char *argv[], char** command_to_exe
   /* Instead of reporting ‘--tree’
      and ‘--group’ as they are encountered,
      we report the final status resulting from them. */
+
+  cout << "Optind is :" << optind << endl;
   if (tree_flag)
     puts ("tree flag is set");
-
+  int flag = 0;
   /* Print any remaining command line arguments (not options). */
   if (optind < argc)
     {
       printf ("non-option ARGV-elements: or command to execute is : ");
       while (optind < argc){
+            flag++;
             printf ("-- %s \n", argv[optind]);
             if(argv[optind] != NULL){
               // cout << argv[optind] <<  " In\n";
               string temp(argv[optind]);
-              command += temp;
-              // command += ' ';
+              if(flag == 1)
+                command += temp;
+
+              else{ 
+                arguments += temp;
+                arguments += ' ';
+              }
             }
             optind++;
       }
+      if(arguments.size()) arguments.erase(arguments.size() -1, 1); 
       putchar ('\n');
     }
+    cout << command << "-" << endl;
+    cout << arguments << "-" << endl;
     // A great function :  Converts Const char * to char *
     // http://stackoverflow.com/questions/12862739/convert-string-to-char
     *command_to_execute = strdup(command.c_str());
+    *command_arguments = strdup(arguments.c_str());
     // cout << " -" << *command_to_execute << "-" << endl;
 
     // exit(0); 

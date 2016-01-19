@@ -17,9 +17,13 @@
 #include <sys/wait.h> 
 
 int signal_to_kill(pid_t , int , int );
-int reading_command_line_arguments(int , char *[], char** );
+int reading_command_line_arguments(int , char *[], char**, char** , int* fork_allowed);
+// int reading_command_line_arguments(int , char *[], int *, int* );
+
 void init_sigaction(int );
 void init_time(void);
 void sig_handler(int );
+
+pid_t waitpid(pid_t pid, int *status, int options); 
 
 #endif
