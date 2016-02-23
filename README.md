@@ -8,6 +8,23 @@ Build Instructions:-
 The file uses some commands of c++11. So use ths flag -std=c++11 while compiling.<br />
 Comilation Command:- `g++ final_v.cpp -w -std=c++11`
 
+Update :- Added makefile. Just type make in terminal and Voila!.
+
+
+File Structure
+--------------
+
+There are basically three files which constitute the whole project.
+
+An open source .so file has been imported from Sharif-Judge. This file is imported only for a very specific 
+purpose in the sandbox. Rest depends upon `final_v.cpp` and `parse.cpp`. All the functions are defined in the 
+file `parse.cpp` and are used in the file `final_v.cpp`. Whenever you run any command using it, it takes comamnd 
+line input for the process to be ran and allowed resource limits. Then it periodically checks for the resource being
+used by that process and the child process it creates. If at any time the combined resource usage of that process family
+exceeds the limts, all the processes in the family are terminated.
+
+All the other files are basically for testing purposes.
+
 Using
 -----
 
