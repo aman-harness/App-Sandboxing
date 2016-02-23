@@ -16,7 +16,7 @@
 #include <sstream>
 #include <sys/types.h> 
 #include <sys/wait.h> 
-#include <fcntl.h>    /* For O_RDWR */
+#include <fcntl.h> 
 #include <unistd.h> 
 
 
